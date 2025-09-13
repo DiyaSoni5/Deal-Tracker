@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Printer } from 'lucide-react';
 import { mockAPI } from '../utils/mockData';
+import pdfIcon from './pdf (1).png';
 
 function BrokerageInvoice() {
   const [deals, setDeals] = useState([]);
@@ -39,8 +40,16 @@ function BrokerageInvoice() {
     return selectedDeals.reduce((total, dealId) => {
       const deal = deals.find(d => d.deal_id === dealId);
       if (deal) {
-        const amount = deal.rate * deal.quantity;
-        const brokerage = (amount * deal.brokerage_percent) / 100;
+        let amount;
+        if (deal.calculation_mode === 'per_kg' && deal.kg_per_unit) {
+          amount = deal.rate * deal.quantity * deal.kg_per_unit;
+        } else {
+          amount = deal.rate * deal.quantity;
+        }
+        // Apply discount first, then calculate brokerage
+        const discount = (amount * (deal.discount_percent || 0)) / 100;
+        const amountAfterDiscount = amount - discount;
+        const brokerage = (amountAfterDiscount * (deal.brokerage_percent || 0.5)) / 100;
         return total + brokerage;
       }
       return total;
@@ -261,7 +270,7 @@ function BrokerageInvoice() {
           disabled={selectedDeals.length === 0}
           className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 flex items-center"
         >
-          <FileText className="w-4 h-4 mr-2" />
+          <img src={pdfIcon} alt="PDF" className="w-4 h-4 mr-2" />
           Generate Invoice
         </button>
         <button

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Calculator } from 'lucide-react';
+import { Save, Calculator, RefreshCw } from 'lucide-react';
 import { mockAPI } from '../utils/mockData';
 
-function DealEntry() {
+function DealEntry({ persistentDeal, setPersistentDeal }) {
   const [suppliers, setSuppliers] = useState([]);
   const [buyers, setBuyers] = useState([]);
-  const [deal, setDeal] = useState({
+  const [deal, setDeal] = useState(persistentDeal || {
     supplier_id: '',
     buyer_id: '',
     confirmation_date: new Date().toISOString().split('T')[0],
@@ -17,9 +17,20 @@ function DealEntry() {
     calculation_mode: 'per_kg',
     discount_percent: 0,
     brokerage_percent: 0.5,
+    brokerage_mode: 'percentage',
+    brokerage_per_bag: '',
     gst_percent: 5,
+    brokerage_gst_enabled: false,
+    brokerage_gst_percent: 18,
     status: 'Confirmed'
   });
+  
+  // Update persistent state when deal changes
+  useEffect(() => {
+    if (setPersistentDeal) {
+      setPersistentDeal(deal);
+    }
+  }, [deal, setPersistentDeal]);
   const [calculations, setCalculations] = useState({
     amount_without_gst: 0,
     discount_amount: 0,
@@ -40,7 +51,7 @@ function DealEntry() {
 
   useEffect(() => {
     calculateAmounts();
-  }, [deal.rate, deal.quantity, deal.kg_per_unit, deal.calculation_mode, deal.discount_percent, deal.gst_percent, deal.brokerage_percent]);
+  }, [deal.rate, deal.quantity, deal.kg_per_unit, deal.calculation_mode, deal.discount_percent, deal.gst_percent, deal.brokerage_percent, deal.brokerage_mode, deal.brokerage_per_bag, deal.brokerage_gst_enabled, deal.brokerage_gst_percent]);
 
   const loadSuppliers = async () => {
     try {
@@ -85,7 +96,15 @@ function DealEntry() {
     const amount_after_discount = amount_without_gst - discount_amount;
     const gst_amount = (amount_after_discount * gstPercent) / 100;
     const amount_with_gst = amount_after_discount + gst_amount;
-    const brokerage_amount = (amount_without_gst * brokeragePercent) / 100;
+    
+    // Calculate brokerage based on mode
+    let brokerage_amount;
+    if (deal.brokerage_mode === 'per_bag') {
+      brokerage_amount = quantity * parseFloat(deal.brokerage_per_bag || 0);
+    } else {
+      // Percentage mode - brokerage on amount after discount (without GST)
+      brokerage_amount = (amount_after_discount * brokeragePercent) / 100;
+    }
 
     setCalculations({
       amount_without_gst,
@@ -101,11 +120,34 @@ function DealEntry() {
     e.preventDefault();
     try {
       const api = window.electronAPI || mockAPI;
-      await api.addDeal(deal);
-      alert('Deal added successfully!');
+      // Add all calculated amounts to deal
+      const dealWithCalculations = {
+        ...deal,
+        amount_without_gst: calculations.amount_without_gst,
+        discount_amount: calculations.discount_amount,
+        gst_amount: calculations.gst_amount,
+        total_amount: calculations.amount_with_gst,
+        brokerage_amount: calculations.brokerage_amount,
+        total_kg: calculations.total_kg
+      };
+      
+      if (deal.deal_id) {
+        // Update existing deal
+        if (api.updateDeal) {
+          await api.updateDeal(dealWithCalculations);
+        } else {
+          await mockAPI.updateDeal(dealWithCalculations);
+        }
+        alert('Deal updated successfully!');
+      } else {
+        // Add new deal
+        await api.addDeal(dealWithCalculations);
+        alert('Deal added successfully!');
+      }
+      // Don't reset form - keep data for reference
     } catch (error) {
-      console.error('Error adding deal:', error);
-      alert('Error adding deal');
+      console.error('Error saving deal:', error);
+      alert('Error saving deal');
     }
   };
 
@@ -118,7 +160,6 @@ function DealEntry() {
       setShowSupplierForm(false);
       loadSuppliers();
       setDeal({...deal, supplier_id: result.lastID});
-      alert('Supplier added successfully!');
     } catch (error) {
       console.error('Error adding supplier:', error);
       alert('Error adding supplier');
@@ -134,7 +175,6 @@ function DealEntry() {
       setShowBuyerForm(false);
       loadBuyers();
       setDeal({...deal, buyer_id: result.lastID});
-      alert('Buyer added successfully!');
     } catch (error) {
       console.error('Error adding buyer:', error);
       alert('Error adding buyer');
@@ -143,8 +183,6 @@ function DealEntry() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">New Deal Entry</h1>
-      
       {/* Small Supplier Modal */}
       {showSupplierForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -300,13 +338,15 @@ function DealEntry() {
                       <td colSpan="6" className="border border-black p-3">Total Brokerage Amount</td>
                       <td className="border border-black p-3 text-right">₹{calculations.brokerage_amount.toLocaleString()}</td>
                     </tr>
-                    <tr>
-                      <td colSpan="6" className="border border-black p-3">GST @ 18%</td>
-                      <td className="border border-black p-3 text-right">₹{(calculations.brokerage_amount * 0.18).toLocaleString()}</td>
-                    </tr>
+                    {deal.brokerage_gst_enabled && (
+                      <tr>
+                        <td colSpan="6" className="border border-black p-3">GST @ {deal.brokerage_gst_percent}%</td>
+                        <td className="border border-black p-3 text-right">₹{((calculations.brokerage_amount * parseFloat(deal.brokerage_gst_percent || 0)) / 100).toLocaleString()}</td>
+                      </tr>
+                    )}
                     <tr className="bg-gray-50 font-bold">
                       <td colSpan="6" className="border border-black p-3">Grand Total</td>
-                      <td className="border border-black p-3 text-right">₹{(calculations.brokerage_amount * 1.18).toLocaleString()}</td>
+                      <td className="border border-black p-3 text-right">₹{deal.brokerage_gst_enabled ? (calculations.brokerage_amount * (1 + parseFloat(deal.brokerage_gst_percent || 0) / 100)).toLocaleString() : calculations.brokerage_amount.toLocaleString()}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -436,7 +476,7 @@ function DealEntry() {
                 type="text"
                 value={deal.product_name}
                 onChange={(e) => setDeal({...deal, product_name: e.target.value})}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-text"
                 placeholder="e.g., Cotton Yarn"
                 required
               />
@@ -542,15 +582,16 @@ function DealEntry() {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Brokerage (%)
+                  Brokerage Mode
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={deal.brokerage_percent}
-                  onChange={(e) => setDeal({...deal, brokerage_percent: e.target.value})}
+                <select
+                  value={deal.brokerage_mode || 'percentage'}
+                  onChange={(e) => setDeal({...deal, brokerage_mode: e.target.value})}
                   className="w-full border border-gray-300 rounded-md px-3 py-2"
-                />
+                >
+                  <option value="percentage">Percentage (%)</option>
+                  <option value="per_bag">Per Bag (₹)</option>
+                </select>
               </div>
               
               <div>
@@ -566,14 +607,80 @@ function DealEntry() {
                 />
               </div>
             </div>
+            
+            {/* Brokerage Input */}
+            <div className="grid grid-cols-1 gap-4">
+              {deal.brokerage_mode === 'per_bag' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Brokerage per Bag (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={deal.brokerage_per_bag}
+                    onChange={(e) => setDeal({...deal, brokerage_per_bag: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    placeholder="Enter amount per bag"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Brokerage (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={deal.brokerage_percent}
+                    onChange={(e) => setDeal({...deal, brokerage_percent: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  />
+                </div>
+              )}
+            </div>
+            
 
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center justify-center"
-            >
-              <Save className="w-4 h-4 mr-2" />
-              Save Deal
-            </button>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const resetDeal = {
+                    supplier_id: '',
+                    buyer_id: '',
+                    confirmation_date: new Date().toISOString().split('T')[0],
+                    product_name: '',
+                    rate: '',
+                    quantity: '',
+                    unit: 'bags',
+                    kg_per_unit: 50,
+                    calculation_mode: 'per_kg',
+                    discount_percent: 0,
+                    brokerage_percent: 0.5,
+                    gst_percent: 5,
+                    brokerage_gst_enabled: false,
+                    brokerage_gst_percent: 18,
+                    status: 'Confirmed'
+                  };
+                  setDeal(resetDeal);
+                  if (setPersistentDeal) {
+                    setPersistentDeal(resetDeal);
+                  }
+                }}
+                className="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700 flex items-center justify-center"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </button>
+              <button
+                type="submit"
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 flex items-center justify-center"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {deal.deal_id ? 'Update Deal' : 'Save Deal'}
+              </button>
+            </div>
           </form>
         </div>
 
@@ -586,8 +693,8 @@ function DealEntry() {
           
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-600">Amount (without GST):</span>
-              <span className="font-medium">₹{calculations.amount_without_gst.toLocaleString()}</span>
+              <span className="text-gray-600">Base Amount:</span>
+              <span className="font-medium">₹{calculations.amount_without_gst.toLocaleString('en-IN')}</span>
             </div>
             
             {deal.calculation_mode === 'per_kg' && calculations.total_kg && (
@@ -599,25 +706,30 @@ function DealEntry() {
             
             <div className="flex justify-between">
               <span className="text-gray-600">Cash Discount:</span>
-              <span className="font-medium text-red-600">-₹{calculations.discount_amount.toLocaleString()}</span>
+              <span className="font-medium text-red-600">-₹{calculations.discount_amount.toLocaleString('en-IN')}</span>
             </div>
             
             <div className="flex justify-between">
-              <span className="text-gray-600">GST Amount:</span>
-              <span className="font-medium">₹{calculations.gst_amount.toLocaleString()}</span>
+              <span className="text-gray-600">Amount (after discount/without GST):</span>
+              <span className="font-medium">₹{(calculations.amount_without_gst - calculations.discount_amount).toLocaleString('en-IN')}</span>
+            </div>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600">GST Amount({deal.gst_percent}%):</span>
+              <span className="font-medium">₹{calculations.gst_amount.toLocaleString('en-IN')}</span>
             </div>
             
             <div className="border-t pt-3">
               <div className="flex justify-between text-lg font-semibold">
-                <span>Total Amount:</span>
-                <span>₹{calculations.amount_with_gst.toLocaleString()}</span>
+                <span>Total Amount with GST:</span>
+                <span>₹{calculations.amount_with_gst.toLocaleString('en-IN')}</span>
               </div>
             </div>
             
             <div className="border-t pt-3">
               <div className="flex justify-between text-green-600 font-medium">
-                <span>Your Brokerage:</span>
-                <span>₹{calculations.brokerage_amount.toLocaleString()}</span>
+                <span>Your Brokerage {deal.brokerage_mode === 'per_bag' ? `(₹${deal.brokerage_per_bag || 0}/bag)` : `(${deal.brokerage_percent}%)`}:</span>
+                <span>₹{calculations.brokerage_amount.toLocaleString('en-IN')}</span>
               </div>
             </div>
             

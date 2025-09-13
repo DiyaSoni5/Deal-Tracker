@@ -1,20 +1,30 @@
 import React, { useState } from 'react';
 import { Trash2, AlertTriangle } from 'lucide-react';
-import { mockSuppliers, mockBuyers, mockDeals } from '../utils/mockData';
+import { mockAPI } from '../utils/mockData';
 
-function DataReset() {
+function DataReset({ onReset }) {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const resetAllData = async () => {
     try {
-      // For mock data, clear the arrays
-      mockSuppliers.length = 0;
-      mockBuyers.length = 0;
-      mockDeals.length = 0;
+      const api = window.electronAPI?.resetAllData ? window.electronAPI : mockAPI;
+      await api.resetAllData();
+      
+      // Clear localStorage if any
+      localStorage.clear();
+      
+      // Clear persistent deal state
+      if (onReset) {
+        onReset();
+      }
       
       alert('All data has been reset successfully!');
       setShowConfirm(false);
-      window.location.reload(); // Refresh the app
+      
+      // Force reload to refresh all components
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
     } catch (error) {
       console.error('Error resetting data:', error);
       alert('Error resetting data');

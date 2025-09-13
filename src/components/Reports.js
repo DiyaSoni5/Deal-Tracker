@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Calendar } from 'lucide-react';
 import { mockAPI } from '../utils/mockData';
+import excelIcon from './excel.png';
 
-function Reports() {
+function Reports({ onOpenDeal, initialFilters }) {
   const [deals, setDeals] = useState([]);
   const [filteredDeals, setFilteredDeals] = useState([]);
   const [filters, setFilters] = useState({
@@ -10,7 +11,8 @@ function Reports() {
     endDate: '',
     supplier: '',
     buyer: '',
-    status: ''
+    status: initialFilters?.status || '',
+    dateRange: initialFilters?.dateRange || ''
   });
   const [summary, setSummary] = useState({
     totalDeals: 0,
@@ -22,6 +24,8 @@ function Reports() {
   useEffect(() => {
     loadDeals();
   }, []);
+  
+
 
   useEffect(() => {
     applyFilters();
@@ -65,24 +69,56 @@ function Reports() {
     }
 
     if (filters.status) {
-      filtered = filtered.filter(deal => deal.status === filters.status);
+      filtered = filtered.filter(deal => (deal.payment_status || 'Pending') === filters.status);
     }
+    
+    if (filters.dateRange === 'month') {
+      const thisMonth = new Date().getMonth();
+      const thisYear = new Date().getFullYear();
+      filtered = filtered.filter(deal => {
+        const dealDate = new Date(deal.confirmation_date);
+        return dealDate.getMonth() === thisMonth && dealDate.getFullYear() === thisYear;
+      });
+    }
+
 
     setFilteredDeals(filtered);
 
-    // Calculate summary
+    // Calculate summary with correct formulas
     const totalDeals = filtered.length;
     const totalAmount = filtered.reduce((sum, deal) => {
-      const amount = deal.rate * deal.quantity;
-      const gst = (amount * deal.gst_percent) / 100;
-      return sum + amount + gst;
+      let amount;
+      if (deal.calculation_mode === 'per_kg' && deal.kg_per_unit) {
+        amount = deal.rate * deal.quantity * deal.kg_per_unit;
+      } else {
+        amount = deal.rate * deal.quantity;
+      }
+      const discount = (amount * (deal.discount_percent || 0)) / 100;
+      const amountAfterDiscount = amount - discount;
+      const gst = (amountAfterDiscount * (deal.gst_percent || 0)) / 100;
+      return sum + amountAfterDiscount + gst; // Total with GST
     }, 0);
     const totalBrokerage = filtered.reduce((sum, deal) => {
-      return sum + ((deal.rate * deal.quantity * deal.brokerage_percent) / 100);
+      let amount;
+      if (deal.calculation_mode === 'per_kg' && deal.kg_per_unit) {
+        amount = deal.rate * deal.quantity * deal.kg_per_unit;
+      } else {
+        amount = deal.rate * deal.quantity;
+      }
+      const discount = (amount * (deal.discount_percent || 0)) / 100;
+      const amountAfterDiscount = amount - discount;
+      return sum + ((amountAfterDiscount * (deal.brokerage_percent || 0.5)) / 100);
     }, 0);
     const totalGST = filtered.reduce((sum, deal) => {
-      const amount = deal.rate * deal.quantity;
-      return sum + ((amount * deal.gst_percent) / 100);
+      let amount;
+      if (deal.calculation_mode === 'per_kg' && deal.kg_per_unit) {
+        amount = deal.rate * deal.quantity * deal.kg_per_unit;
+      } else {
+        amount = deal.rate * deal.quantity;
+      }
+      const discount = (amount * (deal.discount_percent || 0)) / 100;
+      const amountAfterDiscount = amount - discount;
+      return sum + ((amountAfterDiscount * (deal.gst_percent || 0)) / 100);
     }, 0);
 
     setSummary({ totalDeals, totalAmount, totalBrokerage, totalGST });
@@ -130,83 +166,29 @@ function Reports() {
           onClick={exportToCSV}
           className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 flex items-center"
         >
-          <Download className="w-4 h-4 mr-2" />
+          <img src={excelIcon} alt="Excel" className="w-4 h-4 mr-2" />
           Export CSV
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
-        <h2 className="text-lg font-medium mb-4 flex items-center">
-          <Calendar className="w-5 h-5 mr-2" />
-          Filters
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Supplier
-            </label>
-            <input
-              type="text"
-              value={filters.supplier}
-              onChange={(e) => setFilters({...filters, supplier: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-              placeholder="Search supplier..."
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Buyer
-            </label>
-            <input
-              type="text"
-              value={filters.buyer}
-              onChange={(e) => setFilters({...filters, buyer: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-              placeholder="Search buyer..."
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({...filters, status: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            >
-              <option value="">All Status</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="In-progress">In-progress</option>
-              <option value="Completed">Completed</option>
-            </select>
-          </div>
+      {/* Compact Filters */}
+      <div className="bg-white p-3 rounded-lg shadow mb-4">
+        <div className="flex items-center gap-3 text-sm">
+          <input type="date" value={filters.startDate} onChange={(e) => setFilters({...filters, startDate: e.target.value})} className="border border-gray-300 rounded px-2 py-1" placeholder="Start Date" />
+          <input type="date" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} className="border border-gray-300 rounded px-2 py-1" placeholder="End Date" />
+          <input type="text" value={filters.supplier} onChange={(e) => setFilters({...filters, supplier: e.target.value})} className="border border-gray-300 rounded px-2 py-1 w-32" placeholder="Supplier..." />
+          <input type="text" value={filters.buyer} onChange={(e) => setFilters({...filters, buyer: e.target.value})} className="border border-gray-300 rounded px-2 py-1 w-32" placeholder="Buyer..." />
+          <select value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})} className="border border-gray-300 rounded px-2 py-1">
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Delivered">Delivered</option>
+            <option value="Paid">Paid</option>
+          </select>
+          {(filters.status || filters.dateRange || initialFilters) && (
+            <button onClick={() => setFilters({startDate: '', endDate: '', supplier: '', buyer: '', status: '', dateRange: ''})} className="bg-gray-500 text-white px-2 py-1 rounded text-xs">
+              Clear Filters
+            </button>
+          )}
         </div>
       </div>
 
@@ -273,7 +255,11 @@ function Reports() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredDeals.map((deal) => (
-                <tr key={deal.deal_id}>
+                <tr 
+                  key={deal.deal_id}
+                  className="cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => onOpenDeal && onOpenDeal(deal)}
+                >
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(deal.confirmation_date).toLocaleDateString()}
                   </td>
@@ -293,16 +279,41 @@ function Reports() {
                     ₹{deal.rate}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                    ₹{((deal.rate * deal.quantity * deal.brokerage_percent) / 100).toLocaleString()}
+                    ₹{(() => {
+                      let amount;
+                      if (deal.calculation_mode === 'per_kg' && deal.kg_per_unit) {
+                        amount = deal.rate * deal.quantity * deal.kg_per_unit;
+                      } else {
+                        amount = deal.rate * deal.quantity;
+                      }
+                      // Apply discount first, then calculate brokerage
+                      const discount = (amount * (deal.discount_percent || 0)) / 100;
+                      const amountAfterDiscount = amount - discount;
+                      return ((amountAfterDiscount * (deal.brokerage_percent || 0.5)) / 100).toLocaleString();
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      deal.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                      deal.status === 'In-progress' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {deal.status}
-                    </span>
+                    {(deal.payment_status === 'Delivered' || deal.payment_status === 'Paid') ? (
+                      <select
+                        onClick={(e) => e.stopPropagation()}
+                        value={deal.payment_status}
+                        onChange={async (e) => {
+                          const api = window.electronAPI || mockAPI;
+                          await api.updateDealPayment(deal.deal_id, e.target.value);
+                          loadDeals();
+                        }}
+                        className={`px-2 py-1 rounded text-xs font-medium cursor-pointer ${
+                          deal.payment_status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        <option value="Delivered">Delivered</option>
+                        <option value="Paid">Paid</option>
+                      </select>
+                    ) : (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
+                        {deal.payment_status || 'Pending'}
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

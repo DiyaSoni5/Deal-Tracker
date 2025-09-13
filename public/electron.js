@@ -1,12 +1,13 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
-const Database = require('./database');
+const Database = require('../src/database/database');
 
 let mainWindow;
-let db;
+let database;
 
 function createWindow() {
+  // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -18,33 +19,40 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadURL(
-    isDev
-      ? 'http://localhost:3000'
-      : `file://${path.join(__dirname, '../build/index.html')}`
-  );
+  // Load the app
+  const startUrl = isDev 
+    ? 'http://localhost:3001' 
+    : `file://${path.join(__dirname, '../build/index.html')}`;
+  
+  mainWindow.loadURL(startUrl);
 
+  // Initialize database
+  initializeDatabase();
+
+  // Open DevTools in development
   if (isDev) {
-    // mainWindow.webContents.openDevTools();
-    // Prevent browser from opening
-    mainWindow.webContents.setWindowOpenHandler(() => {
-      return { action: 'deny' };
-    });
+    mainWindow.webContents.openDevTools();
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    if (database) {
+      database.close();
+    }
+  });
+}
+
+function initializeDatabase() {
+  try {
+    database = new Database();
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
   }
 }
 
-app.whenReady().then(() => {
-  // Initialize database
-  db = new Database();
-  
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
+// App event listeners
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -52,75 +60,139 @@ app.on('window-all-closed', () => {
   }
 });
 
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
+
 // IPC handlers for database operations
-ipcMain.handle('get-suppliers', async () => {
+ipcMain.handle('db-add-supplier', async (event, supplier) => {
   try {
-    return await db.getSuppliers();
+    if (!database) throw new Error('Database not initialized');
+    return await database.addSupplier(supplier);
   } catch (error) {
-    console.error('Error getting suppliers:', error);
+    console.error('Error in db-add-supplier:', error);
     throw error;
   }
 });
 
-ipcMain.handle('get-buyers', async () => {
+ipcMain.handle('db-get-suppliers', async () => {
   try {
-    return await db.getBuyers();
+    if (!database) throw new Error('Database not initialized');
+    return await database.getSuppliers();
   } catch (error) {
-    console.error('Error getting buyers:', error);
+    console.error('Error in db-get-suppliers:', error);
     throw error;
   }
 });
 
-ipcMain.handle('get-deals', async () => {
+ipcMain.handle('db-add-buyer', async (event, buyer) => {
   try {
-    return await db.getDeals();
+    if (!database) throw new Error('Database not initialized');
+    return await database.addBuyer(buyer);
   } catch (error) {
-    console.error('Error getting deals:', error);
+    console.error('Error in db-add-buyer:', error);
     throw error;
   }
 });
 
-ipcMain.handle('add-supplier', async (event, supplier) => {
+ipcMain.handle('db-get-buyers', async () => {
   try {
-    return await db.addSupplier(supplier);
+    if (!database) throw new Error('Database not initialized');
+    return await database.getBuyers();
   } catch (error) {
-    console.error('Error adding supplier:', error);
+    console.error('Error in db-get-buyers:', error);
     throw error;
   }
 });
 
-ipcMain.handle('add-buyer', async (event, buyer) => {
+ipcMain.handle('db-add-deal', async (event, deal) => {
   try {
-    return await db.addBuyer(buyer);
+    if (!database) throw new Error('Database not initialized');
+    return await database.addDeal(deal);
   } catch (error) {
-    console.error('Error adding buyer:', error);
+    console.error('Error in db-add-deal:', error);
     throw error;
   }
 });
 
-ipcMain.handle('add-deal', async (event, deal) => {
+ipcMain.handle('db-get-deals', async () => {
   try {
-    return await db.addDeal(deal);
+    if (!database) throw new Error('Database not initialized');
+    return await database.getDeals();
   } catch (error) {
-    console.error('Error adding deal:', error);
+    console.error('Error in db-get-deals:', error);
     throw error;
   }
 });
 
-ipcMain.handle('get-dashboard-stats', async () => {
+ipcMain.handle('db-update-deal', async (event, deal) => {
   try {
-    return await db.getDashboardStats();
+    if (!database) throw new Error('Database not initialized');
+    return await database.updateDeal(deal);
   } catch (error) {
-    console.error('Error getting dashboard stats:', error);
+    console.error('Error in db-update-deal:', error);
     throw error;
   }
 });
 
-ipcMain.handle('delete-deal', async (event, dealId) => {
+ipcMain.handle('db-delete-deal', async (event, dealId) => {
   try {
-    return await db.deleteDeal(dealId);
+    if (!database) throw new Error('Database not initialized');
+    return await database.deleteDeal(dealId);
   } catch (error) {
-    console.error('Error deleting deal:', error);
+    console.error('Error in db-delete-deal:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('db-update-deal-payment', async (event, dealId, paymentStatus) => {
+  try {
+    if (!database) throw new Error('Database not initialized');
+    return await database.updateDealPayment(dealId, paymentStatus);
+  } catch (error) {
+    console.error('Error in db-update-deal-payment:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('db-add-delivery', async (event, delivery) => {
+  try {
+    if (!database) throw new Error('Database not initialized');
+    return await database.addDelivery(delivery);
+  } catch (error) {
+    console.error('Error in db-add-delivery:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('db-get-deliveries', async (event, params) => {
+  try {
+    if (!database) throw new Error('Database not initialized');
+    return await database.getDeliveries(params);
+  } catch (error) {
+    console.error('Error in db-get-deliveries:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('db-get-delivery-summary', async (event, dealId) => {
+  try {
+    if (!database) throw new Error('Database not initialized');
+    return await database.getDeliverySummary(dealId);
+  } catch (error) {
+    console.error('Error in db-get-delivery-summary:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('db-get-dashboard-stats', async () => {
+  try {
+    if (!database) throw new Error('Database not initialized');
+    return await database.getDashboardStats();
+  } catch (error) {
+    console.error('Error in db-get-dashboard-stats:', error);
     throw error;
   }
 });
