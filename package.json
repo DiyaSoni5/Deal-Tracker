@@ -2,6 +2,7 @@
   "name": "broker-deal-tracker",
   "version": "1.0.0",
   "description": "Broker Deal Management Software",
+  "author": "Deal Tracker Team",
   "main": "public/electron.js",
   "homepage": "./",
   "scripts": {
@@ -10,24 +11,33 @@
     "build": "react-scripts build",
     "electron": "electron .",
     "electron-dev": "ELECTRON_IS_DEV=true electron .",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "dist-win": "npm run build && electron-builder --win",
+    "build-installer": "npm run build && npx electron-builder --win --x64",
+    "package-app": "npm run build && npx electron-packager . deal-tracker --platform=win32 --arch=x64 --out=dist/ --overwrite",
+    "create-installer": "npm run package-app && node create-installer.js",
+    "pack": "npm run build && electron-builder --dir"
   },
   "dependencies": {
     "date-fns": "^2.30.0",
-    "electron": "^27.0.0",
+    "dotenv": "^17.4.2",
     "lucide-react": "^0.294.0",
+    "mongoose": "^9.7.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^5.1.6",
     "tailwindcss": "^3.3.0"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.6",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.0",
+    "electron": "^27.0.0",
     "electron-builder": "^24.6.4",
+    "electron-installer-windows": "^3.0.0",
     "electron-is-dev": "^2.0.0",
+    "electron-packager": "^17.1.2",
     "postcss": "^8.4.31",
     "wait-on": "^7.0.1"
   },
@@ -41,6 +51,44 @@
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
+    ]
+  },
+  "build": {
+    "appId": "com.dealtracker.app",
+    "productName": "Deal Tracker",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      "public/electron.js",
+      "public/preload.js",
+      "public/database.js",
+      "src/database/**/*",
+      "src/db/**/*",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Deal Tracker",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      }
     ]
   }
 }

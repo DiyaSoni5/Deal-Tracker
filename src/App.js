@@ -8,7 +8,7 @@ import BrokerageInvoice from './components/BrokerageInvoice';
 import DataReset from './components/DataReset';
 import GoodsDelivered from './components/GoodsDelivered';
 import DealDetails from './components/DealDetails';
-import { Home, Plus, Users, Building, FileText, Receipt, Trash2 } from 'lucide-react';
+import { Home, Plus, Users, Building, FileText, Receipt, Trash2, Menu, X, TrendingUp } from 'lucide-react';
 
 
 
@@ -17,6 +17,7 @@ function App() {
   const [openedDeal, setOpenedDeal] = useState(null);
   const [dashboardKey, setDashboardKey] = useState(0);
   const [reportsFilters, setReportsFilters] = useState({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Persistent deal state
   const [persistentDeal, setPersistentDeal] = useState({
@@ -83,10 +84,30 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Mobile menu button */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 bg-white rounded-md shadow-md"
+        >
+          {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
-        <div className="p-6">
-          <h1 className="text-xl font-bold text-gray-800">DEAL-TRACKER</h1>
+      <div className={`${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      } lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transition-transform duration-300 ease-in-out`}>
+        <div className="p-5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-base font-extrabold tracking-wide text-indigo-700">DEAL TRACKER</h1>
+              <p className="text-[10px] text-gray-400 tracking-widest uppercase">Broker Suite</p>
+            </div>
+          </div>
         </div>
         <nav className="mt-6">
           {tabs.map((tab) => {
@@ -97,6 +118,7 @@ function App() {
                 onClick={() => {
                   if (tab.id !== 'reports') setReportsFilters({}); // Clear filters when not going to reports
                   setActiveTab(tab.id);
+                  setSidebarOpen(false); // Close sidebar on mobile after selection
                   if (tab.id === 'dashboard') {
                     setTimeout(() => setDashboardKey(prev => prev + 1), 0);
                   }
@@ -113,9 +135,19 @@ function App() {
         </nav>
       </div>
 
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-30 bg-black bg-opacity-50"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        {renderContent()}
+      <div className="flex-1 lg:ml-0 overflow-auto">
+        <div className="pt-16 lg:pt-0">
+          {renderContent()}
+        </div>
       </div>
     </div>
   );

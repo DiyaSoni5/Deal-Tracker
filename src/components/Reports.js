@@ -126,24 +126,37 @@ function Reports({ onOpenDeal, initialFilters }) {
 
   const exportToCSV = () => {
     const headers = [
-      'Date', 'Supplier', 'Buyer', 'Product', 'Quantity', 'Rate', 
+      'Sr No', 'Deal ID', 'Date', 'Supplier', 'Buyer', 'Product', 'Quantity', 'Rate',
       'Amount', 'Discount%', 'GST%', 'Brokerage%', 'Brokerage Amount', 'Status'
     ];
     
-    const csvData = filteredDeals.map(deal => [
-      new Date(deal.confirmation_date).toLocaleDateString(),
-      deal.supplier_name,
-      deal.buyer_name,
-      deal.product_name,
-      `${deal.quantity} ${deal.unit}`,
-      deal.rate,
-      deal.rate * deal.quantity,
-      deal.discount_percent,
-      deal.gst_percent,
-      deal.brokerage_percent,
-      ((deal.rate * deal.quantity * deal.brokerage_percent) / 100).toFixed(2),
-      deal.status
-    ]);
+    const csvData = filteredDeals.map((deal, index) => {
+      let amount;
+      if (deal.calculation_mode === 'per_kg' && deal.kg_per_unit) {
+        amount = deal.rate * deal.quantity * deal.kg_per_unit;
+      } else {
+        amount = deal.rate * deal.quantity;
+      }
+      const discount = (amount * (deal.discount_percent || 0)) / 100;
+      const amountAfterDiscount = amount - discount;
+      const brokerage = (amountAfterDiscount * (deal.brokerage_percent || 0.5)) / 100;
+      return [
+        index + 1,
+        `'${deal.deal_id}`,
+        new Date(deal.confirmation_date).toLocaleDateString(),
+        deal.supplier_name,
+        deal.buyer_name,
+        deal.product_name,
+        `${deal.quantity} ${deal.unit}`,
+        deal.rate,
+        amountAfterDiscount.toFixed(2),
+        deal.discount_percent,
+        deal.gst_percent,
+        deal.brokerage_percent,
+        brokerage.toFixed(2),
+        deal.payment_status || 'Pending'
+      ];
+    });
 
     const csvContent = [headers, ...csvData]
       .map(row => row.map(field => `"${field}"`).join(','))
@@ -178,7 +191,7 @@ function Reports({ onOpenDeal, initialFilters }) {
           <input type="date" value={filters.endDate} onChange={(e) => setFilters({...filters, endDate: e.target.value})} className="border border-gray-300 rounded px-2 py-1" placeholder="End Date" />
           <input type="text" value={filters.supplier} onChange={(e) => setFilters({...filters, supplier: e.target.value})} className="border border-gray-300 rounded px-2 py-1 w-32" placeholder="Supplier..." />
           <input type="text" value={filters.buyer} onChange={(e) => setFilters({...filters, buyer: e.target.value})} className="border border-gray-300 rounded px-2 py-1 w-32" placeholder="Buyer..." />
-          <select value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})} className="border border-gray-300 rounded px-2 py-1">
+          <select value={filters.status} onChange={(e) => setFilters({...filters, status: e.target.value})} className="border border-gray-300 rounded px-3 py-1 w-32">
             <option value="">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Delivered">Delivered</option>
@@ -302,7 +315,7 @@ function Reports({ onOpenDeal, initialFilters }) {
                           await api.updateDealPayment(deal.deal_id, e.target.value);
                           loadDeals();
                         }}
-                        className={`px-2 py-1 rounded text-xs font-medium cursor-pointer ${
+                        className={`pl-2 pr-6 py-1 rounded text-xs font-medium cursor-pointer min-w-[90px] ${
                           deal.payment_status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                         }`}
                       >

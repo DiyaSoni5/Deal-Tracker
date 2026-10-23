@@ -123,6 +123,8 @@ function DealEntry({ persistentDeal, setPersistentDeal }) {
       // Add all calculated amounts to deal
       const dealWithCalculations = {
         ...deal,
+        supplier_id: Number(deal.supplier_id),
+        buyer_id: Number(deal.buyer_id),
         amount_without_gst: calculations.amount_without_gst,
         discount_amount: calculations.discount_amount,
         gst_amount: calculations.gst_amount,

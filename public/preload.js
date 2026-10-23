@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addDelivery: (delivery) => ipcRenderer.invoke('db-add-delivery', delivery),
   getDeliveries: (params) => ipcRenderer.invoke('db-get-deliveries', params),
   getDeliverySummary: (dealId) => ipcRenderer.invoke('db-get-delivery-summary', dealId),
+  markDealPaid: (dealId) => ipcRenderer.invoke('db-mark-deal-paid', dealId),
+  reportDeliveriesDetailed: (filters) => ipcRenderer.invoke('db-report-deliveries-detailed', filters),
   
   // Dashboard
   getDashboardStats: () => ipcRenderer.invoke('db-get-dashboard-stats')

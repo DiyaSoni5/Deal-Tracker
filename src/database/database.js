@@ -156,8 +156,10 @@ class Database {
           amount_without_gst, discount_amount, gst_amount, total_amount, brokerage_amount
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        supplier_id, buyer_id, confirmation_date, product_name, rate, quantity, unit,
-        kg_per_unit, calculation_mode, discount_percent, brokerage_percent, gst_percent,
+        Number(supplier_id), Number(buyer_id), confirmation_date, product_name,
+        Number(rate), Number(quantity), unit,
+        Number(kg_per_unit || 50), calculation_mode || 'per_kg',
+        Number(discount_percent || 0), Number(brokerage_percent || 0.5), Number(gst_percent || 5),
         amount_without_gst, discount_amount, gst_amount, total_amount, brokerage_amount
       ], function(err) {
         if (err) reject(err);
@@ -197,9 +199,12 @@ class Database {
           gst_amount = ?, total_amount = ?, brokerage_amount = ?
         WHERE deal_id = ?
       `, [
-        supplier_id, buyer_id, confirmation_date, product_name, rate, quantity, unit,
-        kg_per_unit, calculation_mode, discount_percent, brokerage_percent, gst_percent,
-        amount_without_gst, discount_amount, gst_amount, total_amount, brokerage_amount, deal_id
+        Number(supplier_id), Number(buyer_id), confirmation_date, product_name,
+        Number(rate), Number(quantity), unit,
+        Number(kg_per_unit || 50), calculation_mode || 'per_kg',
+        Number(discount_percent || 0), Number(brokerage_percent || 0.5), Number(gst_percent || 5),
+        amount_without_gst, discount_amount, gst_amount, total_amount, brokerage_amount,
+        Number(deal_id)
       ], function(err) {
         if (err) reject(err);
         else resolve({ changes: this.changes });

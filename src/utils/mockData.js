@@ -1,4 +1,6 @@
-// Empty arrays - no mock data
+// Mock deliveries store
+const mockDeliveries = [];
+
 export const mockSuppliers = [];
 export const mockBuyers = [];
 export const mockDeals = [];
@@ -8,16 +10,10 @@ export const mockDeals = [];
 // Mock API for browser testing
 export const mockAPI = {
   resetAllData: () => {
-    // Completely clear all arrays
     mockSuppliers.splice(0, mockSuppliers.length);
     mockBuyers.splice(0, mockBuyers.length);
     mockDeals.splice(0, mockDeals.length);
-    
-    // Reset array references
-    while(mockSuppliers.length > 0) mockSuppliers.pop();
-    while(mockBuyers.length > 0) mockBuyers.pop();
-    while(mockDeals.length > 0) mockDeals.pop();
-    
+    mockDeliveries.splice(0, mockDeliveries.length);
     return Promise.resolve();
   },
   getSuppliers: () => Promise.resolve(mockSuppliers),
@@ -52,10 +48,6 @@ export const mockAPI = {
       buyer_name: mockBuyers.find(b => b.buyer_id == deal.buyer_id)?.name || 'Unknown'
     };
     mockDeals.push(newDeal);
-    // Update the first deal to remove it since we're adding a new one
-    if (mockDeals.length > 1 && mockDeals[0].deal_id === 1) {
-      mockDeals.shift();
-    }
     return Promise.resolve({ lastID: newDeal.deal_id });
   },
   deleteDeal: (dealId) => {
@@ -68,7 +60,12 @@ export const mockAPI = {
   updateDeal: (deal) => {
     const dealIndex = mockDeals.findIndex(d => d.deal_id === deal.deal_id);
     if (dealIndex > -1) {
-      mockDeals[dealIndex] = { ...mockDeals[dealIndex], ...deal };
+      mockDeals[dealIndex] = {
+        ...mockDeals[dealIndex],
+        ...deal,
+        supplier_name: mockSuppliers.find(s => s.supplier_id == deal.supplier_id)?.name || mockDeals[dealIndex].supplier_name,
+        buyer_name: mockBuyers.find(b => b.buyer_id == deal.buyer_id)?.name || mockDeals[dealIndex].buyer_name
+      };
       return Promise.resolve({ success: true });
     }
     return Promise.reject(new Error('Deal not found'));
@@ -80,11 +77,35 @@ export const mockAPI = {
     }
     return Promise.resolve();
   },
-  updateDeal: (deal) => {
-    const dealIndex = mockDeals.findIndex(d => d.deal_id === deal.deal_id);
-    if (dealIndex > -1) {
-      mockDeals[dealIndex] = { ...mockDeals[dealIndex], ...deal };
-    }
-    return Promise.resolve();
+  addDelivery: (entry) => {
+    const delivery = { ...entry, delivery_id: Date.now(), created_at: new Date().toISOString() };
+    mockDeliveries.push(delivery);
+    return Promise.resolve({ lastID: delivery.delivery_id });
+  },
+  getDeliveries: (params = {}) => {
+    const rows = params.deal_id
+      ? mockDeliveries.filter(d => d.deal_id === Number(params.deal_id))
+      : mockDeliveries;
+    return Promise.resolve(rows);
+  },
+  getDeliverySummary: (dealId) => {
+    const rows = mockDeliveries.filter(d => d.deal_id === Number(dealId));
+    const total_bags = rows.reduce((s, r) => s + Number(r.bags_delivered || 0), 0);
+    const total_amount = rows.reduce((s, r) => s + Number(r.total_amount || 0), 0);
+    const total_brokerage = rows.reduce((s, r) => s + Number(r.brokerage_amount || 0), 0);
+    return Promise.resolve({ total_bags, total_amount, total_brokerage });
+  },
+  markDealPaid: (dealId) => {
+    const dealIndex = mockDeals.findIndex(d => d.deal_id === dealId);
+    if (dealIndex > -1) mockDeals[dealIndex].payment_status = 'Paid';
+    mockDeliveries.filter(d => d.deal_id === dealId).forEach(d => { d.payment_status = 'Paid'; });
+    return Promise.resolve({ success: true });
+  },
+  reportDeliveriesDetailed: (filters = {}) => {
+    let rows = [...mockDeliveries];
+    if (filters.buyer_name) rows = rows.filter(r => r.buyer_name === filters.buyer_name);
+    if (filters.start_date) rows = rows.filter(r => r.delivery_date >= filters.start_date);
+    if (filters.end_date) rows = rows.filter(r => r.delivery_date <= filters.end_date);
+    return Promise.resolve(rows);
   }
 };

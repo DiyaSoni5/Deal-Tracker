@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, Users, Building, IndianRupee, Trash2, Plus, FileText, AlertCircle, Calendar } from 'lucide-react';
 import { mockAPI } from '../utils/mockData';
 import excelIcon from './excel.png';
-import pdfIcon from './pdf (1).png';
 
 function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
   const [stats, setStats] = useState({
@@ -19,10 +18,6 @@ function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
   useEffect(() => {
     loadDashboardData();
   }, []); // Load on mount
-  
-  useEffect(() => {
-    loadDashboardData();
-  });
   
   useEffect(() => {
     loadDashboardData();
@@ -164,12 +159,12 @@ function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
   );
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+    <div className="p-4 sm:p-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Dashboard</h1>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <StatCard title="Total Deals" value={stats.totalDeals} icon={FileText} color="bg-blue-500" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-4 sm:mb-6">
+        <StatCard title="Total Deals" value={stats.totalDeals} icon={FileText} color="bg-blue-500" onClick={() => setFilters({ paymentStatus: '', dateRange: '', search: '' })} />
         <StatCard 
           title="Unpaid Deals" 
           value={stats.pendingPayments} 
@@ -211,10 +206,10 @@ function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
 
       {/* Recent Deals */}
       <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
             <h2 className="text-lg font-medium text-gray-900">Recent Deals</h2>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <button
               onClick={async () => {
                 // Since we don't have actual delivery data, export deal summary
@@ -248,7 +243,7 @@ function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
                   const row = [
                     index + 1,
                     new Date(deal.confirmation_date).toLocaleDateString('en-GB'),
-                    deal.deal_id,
+                    `"${deal.deal_id}"`,
                     deal.buyer_name,
                     deal.supplier_name,
                     deal.product_name,
@@ -285,23 +280,23 @@ function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
           </div>
           
           {/* Quick Filters */}
-          <div className="flex gap-3 text-sm">
-            <select value={filters.paymentStatus} onChange={(e) => setFilters({...filters, paymentStatus: e.target.value})} className="border border-gray-300 rounded px-2 py-1">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 text-sm">
+            <select value={filters.paymentStatus} onChange={(e) => setFilters({...filters, paymentStatus: e.target.value})} className="border border-gray-300 rounded px-3 py-1 w-full sm:w-32">
               <option value="">All Status</option>
               <option value="Pending">Pending</option>
               <option value="Delivered">Delivered</option>
               <option value="Paid">Paid</option>
             </select>
-            <select value={filters.dateRange} onChange={(e) => setFilters({...filters, dateRange: e.target.value})} className="border border-gray-300 rounded px-2 py-1">
+            <select value={filters.dateRange} onChange={(e) => setFilters({...filters, dateRange: e.target.value})} className="border border-gray-300 rounded px-3 py-1 w-full sm:w-32">
               <option value="">All Time</option>
               <option value="today">Today</option>
               <option value="week">This Week</option>
               <option value="month">This Month</option>
             </select>
-            <input type="text" value={filters.search} onChange={(e) => setFilters({...filters, search: e.target.value})} placeholder="Search supplier/buyer..." className="border border-gray-300 rounded px-2 py-1 w-48" />
+            <input type="text" value={filters.search} onChange={(e) => setFilters({...filters, search: e.target.value})} placeholder="Search supplier/buyer..." className="border border-gray-300 rounded px-2 py-1 w-full sm:w-48" />
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto table-responsive">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -386,7 +381,7 @@ function Dashboard({ onNewDeal, onOpenDeal, setActiveTab }) {
                           await api.updateDealPayment(deal.deal_id, e.target.value);
                           loadDashboardData();
                         }}
-                        className={`px-2 py-1 rounded text-xs font-medium cursor-pointer ${
+                        className={`pl-2 pr-6 py-1 rounded text-xs font-medium cursor-pointer min-w-[90px] ${
                           deal.payment_status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
                         }`}
                       >
